@@ -1,6 +1,8 @@
 package com.example.fitness.repository;
 
 import com.example.fitness.model.Course;
+import com.example.fitness.model.CourseCategory;
+import com.example.fitness.model.CourseDifficulty;
 import com.example.fitness.model.CourseStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -21,6 +23,28 @@ public interface CourseRepository extends JpaRepository<Course, Long> {
             """)
     List<Course> findUpcomingByStatus(@Param("status") CourseStatus status,
                                       @Param("fromDate") LocalDate fromDate);
+
+    @Query("""
+            SELECT c FROM Course c
+            LEFT JOIN FETCH c.trainer t
+            WHERE (:status IS NULL OR c.status = :status)
+              AND (:category IS NULL OR c.category = :category)
+              AND (:difficulty IS NULL OR c.difficulty = :difficulty)
+              AND (:trainerId IS NULL OR t.id = :trainerId)
+              AND (:dateFrom IS NULL OR c.date >= :dateFrom)
+              AND (:dateTo IS NULL OR c.date <= :dateTo)
+              AND (:search IS NULL OR :search = ''
+                   OR LOWER(c.name) LIKE LOWER(CONCAT('%', :search, '%'))
+                   OR LOWER(c.description) LIKE LOWER(CONCAT('%', :search, '%')))
+            """)
+    List<Course> findFiltered(
+            @Param("status") CourseStatus status,
+            @Param("category") CourseCategory category,
+            @Param("difficulty") CourseDifficulty difficulty,
+            @Param("trainerId") Long trainerId,
+            @Param("dateFrom") LocalDate dateFrom,
+            @Param("dateTo") LocalDate dateTo,
+            @Param("search") String search);
 
     @Query("""
             SELECT COUNT(r) FROM CourseRegistration r

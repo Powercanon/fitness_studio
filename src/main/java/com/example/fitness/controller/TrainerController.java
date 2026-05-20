@@ -20,8 +20,12 @@ public class TrainerController {
 
 
     @GetMapping
-    public ResponseEntity<List<TrainerResponse>> getAll() {
-        return ResponseEntity.ok(trainerService.getAll());
+    public ResponseEntity<List<TrainerResponse>> getAll(
+            @RequestParam(required = false) Boolean active,
+            @RequestParam(required = false) String search,
+            @RequestParam(required = false, defaultValue = "lastName") String sortBy,
+            @RequestParam(required = false, defaultValue = "asc") String sortDir) {
+        return ResponseEntity.ok(trainerService.getAll(active, search, sortBy, sortDir));
     }
 
 

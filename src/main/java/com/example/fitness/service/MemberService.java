@@ -5,6 +5,8 @@ import com.example.fitness.dto.MemberResponse;
 import com.example.fitness.dto.MemberStatusRequest;
 import com.example.fitness.exception.BusinessException;
 import com.example.fitness.exception.ResourceNotFoundException;
+import com.example.fitness.model.ContractModel;
+import com.example.fitness.model.Gender;
 import com.example.fitness.model.Member;
 import com.example.fitness.model.MemberStatus;
 import com.example.fitness.repository.MemberRepository;
@@ -13,6 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -21,11 +24,34 @@ public class MemberService {
 
     private final MemberRepository memberRepository;
 
-    public List<MemberResponse> getAll(MemberStatus status, String search) {
-        return memberRepository.findByStatusAndSearch(status, search)
-                .stream()
+    public List<MemberResponse> getAll(MemberStatus status, Gender gender, ContractModel contractModel,
+                                       LocalDate contractFrom, LocalDate contractTo, String search,
+                                       String sortBy, String sortDir) {
+        List<Member> members = memberRepository.findFiltered(status, gender, contractModel, contractFrom, contractTo, search);
+
+        Comparator<Member> comparator = getComparator(sortBy);
+        if ("desc".equalsIgnoreCase(sortDir)) {
+            comparator = comparator.reversed();
+        }
+
+        return members.stream()
+                .sorted(comparator)
                 .map(this::toResponse)
                 .toList();
+    }
+
+    private Comparator<Member> getComparator(String sortBy) {
+        if (sortBy == null) sortBy = "lastName";
+        return switch (sortBy) {
+            case "firstName" -> Comparator.comparing(Member::getFirstName, String.CASE_INSENSITIVE_ORDER);
+            case "email" -> Comparator.comparing(Member::getEmail, String.CASE_INSENSITIVE_ORDER);
+            case "memberNumber" -> Comparator.comparing(Member::getMemberNumber);
+            case "contractStart" -> Comparator.comparing(Member::getContractStart);
+            case "birthDate" -> Comparator.comparing(Member::getBirthDate);
+            case "status" -> Comparator.comparing(m -> m.getStatus().name());
+            default -> Comparator.comparing(Member::getLastName, String.CASE_INSENSITIVE_ORDER)
+                    .thenComparing(Member::getFirstName, String.CASE_INSENSITIVE_ORDER);
+        };
     }
 
     public MemberResponse getById(Long id) {

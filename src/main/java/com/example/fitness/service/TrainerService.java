@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -17,11 +18,29 @@ public class TrainerService {
 
     private final TrainerRepository trainerRepository;
 
-    public List<TrainerResponse> getAll() {
-        return trainerRepository.findAllByOrderByLastNameAscFirstNameAsc()
-                .stream()
+    public List<TrainerResponse> getAll(Boolean active, String search, String sortBy, String sortDir) {
+        List<Trainer> trainers = trainerRepository.findFiltered(active, search);
+
+        Comparator<Trainer> comparator = getComparator(sortBy);
+        if ("desc".equalsIgnoreCase(sortDir)) {
+            comparator = comparator.reversed();
+        }
+
+        return trainers.stream()
+                .sorted(comparator)
                 .map(this::toResponse)
                 .toList();
+    }
+
+    private Comparator<Trainer> getComparator(String sortBy) {
+        if (sortBy == null) sortBy = "lastName";
+        return switch (sortBy) {
+            case "firstName" -> Comparator.comparing(Trainer::getFirstName, String.CASE_INSENSITIVE_ORDER);
+            case "email" -> Comparator.comparing(Trainer::getEmail, String.CASE_INSENSITIVE_ORDER);
+            case "active" -> Comparator.comparing(Trainer::isActive).reversed();
+            default -> Comparator.comparing(Trainer::getLastName, String.CASE_INSENSITIVE_ORDER)
+                    .thenComparing(Trainer::getFirstName, String.CASE_INSENSITIVE_ORDER);
+        };
     }
 
     public TrainerResponse getById(Long id) {

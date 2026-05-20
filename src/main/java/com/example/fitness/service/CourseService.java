@@ -2,6 +2,8 @@ package com.example.fitness.service;
 
 import com.example.fitness.dto.CourseRequest;
 import com.example.fitness.dto.CourseResponse;
+import com.example.fitness.model.CourseCategory;
+import com.example.fitness.model.CourseDifficulty;
 import com.example.fitness.model.CourseStatus;
 import com.example.fitness.exception.BusinessException;
 import com.example.fitness.exception.ResourceNotFoundException;
@@ -14,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.util.Comparator;
 import java.util.List;
 
 @Service
@@ -28,6 +31,45 @@ public class CourseService {
                 .stream()
                 .map(this::toResponse)
                 .toList();
+    }
+
+    public List<CourseResponse> getAll(CourseStatus status, CourseCategory category, CourseDifficulty difficulty,
+                                       Long trainerId, LocalDate dateFrom, LocalDate dateTo, String search,
+                                       Boolean hasAvailability, String sortBy, String sortDir) {
+        List<Course> courses = courseRepository.findFiltered(status, category, difficulty, trainerId, dateFrom, dateTo, search);
+
+        List<CourseResponse> responses = courses.stream()
+                .map(this::toResponse)
+                .toList();
+
+        if (Boolean.TRUE.equals(hasAvailability)) {
+            responses = responses.stream()
+                    .filter(r -> r.getAvailableSpots() > 0)
+                    .toList();
+        }
+
+        Comparator<CourseResponse> comparator = getComparator(sortBy);
+        if ("desc".equalsIgnoreCase(sortDir)) {
+            comparator = comparator.reversed();
+        }
+
+        return responses.stream()
+                .sorted(comparator)
+                .toList();
+    }
+
+    private Comparator<CourseResponse> getComparator(String sortBy) {
+        if (sortBy == null) sortBy = "date";
+        return switch (sortBy) {
+            case "name" -> Comparator.comparing(CourseResponse::getName, String.CASE_INSENSITIVE_ORDER);
+            case "category" -> Comparator.comparing(r -> r.getCategory().name());
+            case "difficulty" -> Comparator.comparing(r -> r.getDifficulty().ordinal());
+            case "trainer" -> Comparator.comparing(r -> r.getTrainerFullName() != null ? r.getTrainerFullName() : "", String.CASE_INSENSITIVE_ORDER);
+            case "time" -> Comparator.comparing(CourseResponse::getTimeFrom);
+            case "availableSpots" -> Comparator.comparing(CourseResponse::getAvailableSpots);
+            default -> Comparator.comparing(CourseResponse::getDate)
+                    .thenComparing(CourseResponse::getTimeFrom);
+        };
     }
 
     public CourseResponse getById(Long id) {

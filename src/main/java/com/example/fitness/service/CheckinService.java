@@ -1,5 +1,6 @@
 package com.example.fitness.service;
 
+import java.util.Comparator;
 import java.util.List;
 
 import com.example.fitness.dto.CapacityResponse;
@@ -16,8 +17,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
+import java.time.LocalTime;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +29,34 @@ public class CheckinService {
 
     private final CheckinRepository checkinRepository;
     private final MemberRepository memberRepository;
+
+    public List<CheckinResponse> getAll(Boolean checkedOut, LocalDate dateFrom, LocalDate dateTo,
+                                        String search, String sortBy, String sortDir) {
+        LocalDateTime dateTimeFrom = dateFrom != null ? dateFrom.atStartOfDay() : null;
+        LocalDateTime dateTimeTo = dateTo != null ? dateTo.atTime(LocalTime.MAX) : null;
+
+        List<Checkin> checkins = checkinRepository.findFiltered(checkedOut, dateTimeFrom, dateTimeTo, search);
+
+        Comparator<Checkin> comparator = getComparator(sortBy);
+        if ("desc".equalsIgnoreCase(sortDir)) {
+            comparator = comparator.reversed();
+        }
+
+        return checkins.stream()
+                .sorted(comparator)
+                .map(this::toResponse)
+                .toList();
+    }
+
+    private Comparator<Checkin> getComparator(String sortBy) {
+        if (sortBy == null) sortBy = "checkedInAt";
+        return switch (sortBy) {
+            case "memberName" -> Comparator.comparing(c -> c.getMember().getLastName(), String.CASE_INSENSITIVE_ORDER);
+            case "memberNumber" -> Comparator.comparing(c -> c.getMember().getMemberNumber());
+            case "checkedOutAt" -> Comparator.comparing(Checkin::getCheckedOutAt, Comparator.nullsLast(Comparator.naturalOrder()));
+            default -> Comparator.comparing(Checkin::getCheckedInAt);
+        };
+    }
 
     public CapacityResponse getCapacity() {
         int current = checkinRepository.countCurrentlyCheckedIn();
