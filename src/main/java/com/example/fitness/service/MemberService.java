@@ -9,12 +9,17 @@ import com.example.fitness.model.ContractModel;
 import com.example.fitness.model.Gender;
 import com.example.fitness.model.Member;
 import com.example.fitness.model.MemberStatus;
+import com.example.fitness.model.User;
+import com.example.fitness.model.UserRole;
 import com.example.fitness.repository.MemberRepository;
+import com.example.fitness.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.Comparator;
 import java.util.List;
 
@@ -23,6 +28,8 @@ import java.util.List;
 public class MemberService {
 
     private final MemberRepository memberRepository;
+    private final UserRepository userRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public List<MemberResponse> getAll(MemberStatus status, Gender gender, ContractModel contractModel,
                                        LocalDate contractFrom, LocalDate contractTo, String search,
@@ -63,22 +70,45 @@ public class MemberService {
         if (memberRepository.existsByEmail(request.getEmail())) {
             throw new BusinessException("Email already in use.");
         }
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new BusinessException("Email already in use.");
+        }
+
+        String tempPassword = request.getBirthDate().format(DateTimeFormatter.ofPattern("ddMMyyyy"));
+
+        User user = User.builder()
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(tempPassword))
+                .role(UserRole.MEMBER)
+                .build();
+        userRepository.save(user);
 
         Member member = new Member();
         applyRequest(member, request);
         member.setMemberNumber(generateMemberNumber());
         member.setStatus(MemberStatus.ACTIVE);
+        member.setUser(user);
 
-        return toResponse(memberRepository.save(member));
+        MemberResponse response = toResponse(memberRepository.save(member));
+        response.setTemporaryPassword(tempPassword);
+        return response;
     }
 
     @Transactional
     public MemberResponse update(Long id, MemberRequest request) {
         Member member = findOrThrow(id);
 
-        if (!member.getEmail().equals(request.getEmail())
-                && memberRepository.existsByEmail(request.getEmail())) {
+        boolean emailChanged = !member.getEmail().equals(request.getEmail());
+        if (emailChanged && memberRepository.existsByEmail(request.getEmail())) {
             throw new BusinessException("Email already in use.");
+        }
+        if (emailChanged && userRepository.existsByEmail(request.getEmail())) {
+            throw new BusinessException("Email already in use.");
+        }
+
+        if (emailChanged && member.getUser() != null) {
+            member.getUser().setEmail(request.getEmail());
+            userRepository.save(member.getUser());
         }
 
         applyRequest(member, request);
@@ -94,10 +124,14 @@ public class MemberService {
 
     @Transactional
     public void delete(Long id) {
-        if (!memberRepository.existsById(id)) {
-            throw new ResourceNotFoundException("Member not found.");
+        Member member = findOrThrow(id);
+        User user = member.getUser();
+        member.setUser(null);
+        memberRepository.save(member);
+        memberRepository.delete(member);
+        if (user != null) {
+            userRepository.delete(user);
         }
-        memberRepository.deleteById(id);
     }
 
     private Member findOrThrow(Long id) {

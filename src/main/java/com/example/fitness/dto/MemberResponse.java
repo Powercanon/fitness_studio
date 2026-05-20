@@ -20,4 +20,5 @@ public class MemberResponse {
     private ContractModel contractModel;
     private LocalDate contractStart;
     private MemberStatus status;
+    private String temporaryPassword;
 }

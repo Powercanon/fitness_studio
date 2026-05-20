@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+@CrossOrigin(origins = "http://localhost:3000")
 @RestController
 @RequestMapping("/api/trainers")
 @RequiredArgsConstructor
@@ -53,4 +54,13 @@ public class TrainerController {
     public ResponseEntity<TrainerResponse> toggleActive(@PathVariable Long id) {
         return ResponseEntity.ok(trainerService.toggleActive(id));
     }
+
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<Void> delete(@PathVariable Long id) {
+        trainerService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
+
+
 }

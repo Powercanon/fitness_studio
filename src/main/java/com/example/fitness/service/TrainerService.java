@@ -70,6 +70,11 @@ public class TrainerService {
     }
 
 
+    @Transactional
+    public void delete(Long id) {
+        trainerRepository.delete(findOrThrow(id));
+    }
+
     private Trainer findOrThrow(Long id) {
         return trainerRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Trainer not found."));
