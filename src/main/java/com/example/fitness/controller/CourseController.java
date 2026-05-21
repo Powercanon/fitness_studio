@@ -103,6 +103,14 @@ public class CourseController {
     }
 
 
+    @GetMapping("/my-registrations")
+    public ResponseEntity<List<RegistrationResponse>> getMyRegistrations(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        Long memberId = resolveMemberId(userDetails);
+        return ResponseEntity.ok(registrationService.getByMember(memberId));
+    }
+
+
     private Long resolveMemberId(UserDetails userDetails) {
         User user = userRepository.findByEmail(userDetails.getUsername())
                 .orElseThrow();
